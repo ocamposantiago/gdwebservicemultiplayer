@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Godot Mobile Sensor Client</title>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            text-align: center;
+        }
+
+        .container {
+            background: #1e1e1e;
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            max-width: 90%;
+            width: 350px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            color: #00e676;
+        }
+
+        .status {
+            margin: 1rem 0;
+            padding: 1rem;
+            border-radius: 8px;
+            background: #2c2c2c;
+            font-size: 0.9rem;
+            color: #b0bec5;
+            word-break: break-all;
+        }
+
+        .connected { border-left: 4px solid #00e676; }
+        .disconnected { border-left: 4px solid #ff1744; }
+
+        button {
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.1s, box-shadow 0.2s;
+            margin-bottom: 1rem;
+        }
+
+        #connectBtn {
+            background: linear-gradient(135deg, #00e676 0%, #00c853 100%);
+            color: #000;
+        }
+
+        #resetBtn {
+            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+            color: white;
+        }
+
+        #spawnBtn {
+            background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
+            color: white;
+            font-size: 2rem;       /* SUPER BIG */
+            padding: 2rem 1rem;    /* SUPER BIG */
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(255, 152, 0, 0.4);
+            margin-top: 2rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        button:active {
+            transform: scale(0.95);
+            box-shadow: 0 4px 15px rgba(0, 230, 118, 0.3);
+        }
+
+        .data-display {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 2rem;
+        }
+
+        .data-box {
+            background: #2a2a2a;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+        }
+        .data-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #00e676;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Godot Sensor Client</h1>
+        
+        <div id="setupSection">
+            <input type="text" id="playerNameInput" placeholder="Enter your name" style="width: 100%; padding: 1rem; margin-bottom: 1rem; border-radius: 8px; border: none; font-size: 1.1rem; box-sizing: border-box; text-align: center; background: #2c2c2c; color: white;">
+            <button id="continueBtn" style="background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%); color: white;">Continue</button>
+        </div>
+
+        <div id="gameSection" style="display: none;">
+            <button id="connectBtn">Connect & Request Gyro</button>
+            <button id="resetBtn" style="display: none;">Reset Baseline</button>
+            <button id="spawnBtn" style="display: none;">Spawn Sphere!</button>
+            
+            <div id="status" class="status disconnected">Disconnected</div>
+
+            <div class="data-display">
+                <div class="data-box">
+                    <div>X (Pitch)</div>
+                    <div id="valX" class="data-value">0.0</div>
+                </div>
+                <div class="data-box">
+                    <div>Y (Yaw)</div>
+                    <div id="valY" class="data-value">0.0</div>
+                </div>
+                <div class="data-box">
+                    <div>Z (Roll)</div>
+                    <div id="valZ" class="data-value">0.0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const statusEl = document.getElementById('status');
+        const connectBtn = document.getElementById('connectBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const spawnBtn = document.getElementById('spawnBtn');
+        const setupSection = document.getElementById('setupSection');
+        const gameSection = document.getElementById('gameSection');
+        const playerNameInput = document.getElementById('playerNameInput');
+        const continueBtn = document.getElementById('continueBtn');
+        const valX = document.getElementById('valX');
+        const valY = document.getElementById('valY');
+        const valZ = document.getElementById('valZ');
+
+        let ws = null;
+        let isStreaming = false;
+        let myPlayerId = 1; // Default to 1
+        let playerName = "Player";
+        
+        continueBtn.addEventListener('click', () => {
+            if (playerNameInput.value.trim() !== '') {
+                playerName = playerNameInput.value.trim();
+            }
+            setupSection.style.display = 'none';
+            gameSection.style.display = 'block';
+        });
+
+        let basePitch = 0, baseYaw = 0, baseRoll = 0;
+        let currentPitch = 0, currentYaw = 0, currentRoll = 0;
+        let lastSendTime = 0;
+
+        function updateStatus(msg, isConnected = false) {
+            statusEl.textContent = msg;
+            if (isConnected) {
+                statusEl.classList.add('connected');
+                statusEl.classList.remove('disconnected');
+                connectBtn.style.display = 'none'; // Hide connect button once active to make room
+                resetBtn.style.display = 'block';
+                spawnBtn.style.display = 'block';
+            } else {
+                statusEl.classList.add('disconnected');
+                statusEl.classList.remove('connected');
+                connectBtn.style.display = 'block';
+                connectBtn.textContent = 'Connect & Request Gyro';
+                resetBtn.style.display = 'none';
+                spawnBtn.style.display = 'none';
+                document.body.style.backgroundColor = '#121212';
+            }
+        }
+
+        function connectWebSocket() {
+            // Use WSS (Secure WebSocket) or WS based on how the page was loaded
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${window.location.host}`;
+            updateStatus(`Connecting to ${wsUrl}...`);
+
+            try {
+                ws = new WebSocket(wsUrl);
+
+                ws.onopen = () => {
+                    updateStatus(`Connected to Godot Server`, true);
+                    isStreaming = true;
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === "assign_id") {
+                            myPlayerId = data.id;
+                            updateStatus(`Connected as ${playerName} (Player ${myPlayerId})`, true);
+                            
+                            // Send name to server
+                            ws.send(JSON.stringify({
+                                address: "/name",
+                                args: [myPlayerId, playerName]
+                            }));
+                            
+                            // Change background color based on Player ID
+                            if (myPlayerId === 1) {
+                                document.body.style.backgroundColor = '#ff003c'; // Bright Saturated Red
+                                document.querySelector('.container').style.backgroundColor = '#cc0030';
+                            } else if (myPlayerId === 2) {
+                                document.body.style.backgroundColor = '#0066ff'; // Bright Saturated Blue
+                                document.querySelector('.container').style.backgroundColor = '#004bcc';
+                            } else {
+                                document.body.style.backgroundColor = '#ffcc00'; // Bright Saturated Yellow
+                                document.querySelector('.container').style.backgroundColor = '#ccaa00';
+                            }
+                            
+                            // Trigger connection haptic
+                            if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+                        }
+                    } catch (e) {
+                        console.log("Ignored non-json message from server");
+                    }
+                };
+
+                ws.onclose = () => {
+                    updateStatus('Disconnected', false);
+                    isStreaming = false;
+                    ws = null;
+                };
+
+                ws.onerror = (err) => {
+                    console.error("WS Error", err);
+                    updateStatus('WebSocket Connection Error', false);
+                };
+
+            } catch (e) {
+                console.error("Failed to construct WebSocket", e);
+                updateStatus('Failed to construct WebSocket', false);
+            }
+        }
+
+        function disconnectWebSocket() {
+            if (ws) {
+                ws.close();
+            }
+            isStreaming = false;
+            updateStatus('Disconnected', false);
+        }
+
+        // iOS requires explicit permission to access sensors, triggered by user interaction
+        function requestSensorPermission() {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            window.addEventListener('deviceorientation', handleOrientation);
+                            connectWebSocket();
+                        } else {
+                            updateStatus('Sensor permission denied');
+                        }
+                    })
+                    .catch(console.error);
+            } else {
+                // Non-iOS 13+ devices
+                window.addEventListener('deviceorientation', handleOrientation);
+                connectWebSocket();
+            }
+        }
+
+        function handleOrientation(event) {
+            currentPitch = (event.beta || 0) * (Math.PI / 180);
+            currentRoll = (event.gamma || 0) * (Math.PI / 180);
+            currentYaw = (event.alpha || 0) * (Math.PI / 180);
+
+            // Calculate relative angles (in radians, roughly -PI to PI)
+            let pitch = currentPitch - basePitch;
+            let roll = currentRoll - baseRoll;
+            
+            // Handle wrap-around for yaw (alpha) which is 0-360 degrees (0-2PI)
+            // We need the shortest angular difference between currentYaw and baseYaw
+            let yaw = currentYaw - baseYaw;
+            yaw = Math.atan2(Math.sin(yaw), Math.cos(yaw));
+
+            // Normalize between -1 and 1
+            // Most natural hand movements stay within +/- 45 degrees (PI/4 ~ 0.785 rad). 
+            // We use 1.0 rad (approx 57 degrees) as our max comfortable range for "1.0" output
+            const MAX_RESTING_ANGLE = 1.0; 
+
+            pitch = Math.max(-1.0, Math.min(1.0, pitch / MAX_RESTING_ANGLE));
+            yaw = Math.max(-1.0, Math.min(1.0, yaw / MAX_RESTING_ANGLE));
+            roll = Math.max(-1.0, Math.min(1.0, roll / MAX_RESTING_ANGLE));
+
+            // Update UI
+            valX.textContent = pitch.toFixed(2);
+            valY.textContent = yaw.toFixed(2);
+            valZ.textContent = roll.toFixed(2);
+
+            // Throttle to 30fps (approx 33.3ms)
+            const now = Date.now();
+            if (now - lastSendTime >= 33) {
+                if (isStreaming && ws && ws.readyState === WebSocket.OPEN) {
+                    const payload = JSON.stringify({
+                        address: "/gyro",
+                        args: [myPlayerId, pitch, yaw, roll]
+                    });
+                    ws.send(payload);
+                    lastSendTime = now;
+                }
+            }
+        }
+
+        spawnBtn.addEventListener('click', () => {
+            if (isStreaming && ws && ws.readyState === WebSocket.OPEN) {
+                const payload = JSON.stringify({
+                    address: "/action",
+                    args: [myPlayerId, "spawn_sphere"]
+                });
+                ws.send(payload);
+                
+                // Short vibration on tap
+                if (navigator.vibrate) navigator.vibrate(30);
+                
+                // Add a little tap feedback
+                const oldColor = spawnBtn.style.background;
+                spawnBtn.style.background = "linear-gradient(135deg, #FFC107 0%, #FFA000 100%)";
+                spawnBtn.style.transform = "scale(0.95)";
+                
+                setTimeout(() => {
+                    spawnBtn.style.background = "";
+                    spawnBtn.style.transform = "none";
+                }, 100);
+            }
+        });
+
+        resetBtn.addEventListener('click', () => {
+            if (navigator.vibrate) navigator.vibrate([20, 30, 20]);
+            basePitch = currentPitch;
+            baseYaw = currentYaw;
+            baseRoll = currentRoll;
+            updateStatus('Gyro baseline reset!', true);
+        });
+
+        connectBtn.addEventListener('click', () => {
+            if (isStreaming) {
+                disconnectWebSocket();
+                window.removeEventListener('deviceorientation', handleOrientation);
+            } else {
+                requestSensorPermission();
+            }
+        });
+
+    </script>
+</body>
+</html>
