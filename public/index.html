@@ -19,6 +19,8 @@
             text-align: center;
             user-select: none;
             -webkit-user-select: none;
+            touch-action: none;
+            overflow: hidden;
         }
 
         .container {
@@ -385,7 +387,8 @@
             }
         }
 
-        spawnBtn.addEventListener('click', () => {
+        spawnBtn.addEventListener('pointerdown', (e) => {
+            e.preventDefault(); // Prevents simulated mouse events like 'click' from firing later
             if (isStreaming && ws && ws.readyState === WebSocket.OPEN) {
                 const payload = JSON.stringify({
                     address: "/action",
