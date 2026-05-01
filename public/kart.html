@@ -289,9 +289,9 @@
             
             // Binary steering mapping based on X axis
             if (dx > 20) {
-                inputState.steer = 1;
+                inputState.steer = -1; // Right turn is negative in Godot's mapped logic
             } else if (dx < -20) {
-                inputState.steer = -1;
+                inputState.steer = 1;  // Left turn is positive
             } else {
                 inputState.steer = 0;
             }
