@@ -68,6 +68,23 @@
             position: relative;
         }
 
+        /* Landscape hint overlay if device is portrait */
+        @media screen and (orientation: portrait) {
+            #gameSection::before {
+                content: "Please rotate your device to Landscape 🔄";
+                position: absolute;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0,0,0,0.9);
+                color: #00e676;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.5rem;
+                font-weight: bold;
+                z-index: 1000;
+            }
+        }
+
         .status {
             position: absolute;
             top: 20px;
@@ -232,17 +249,35 @@
             if (joyActive) updateJoystick(e);
         });
 
-        window.addEventListener('pointerup', (e) => {
-            if (joyActive) {
-                joyActive = false;
-                joystickKnob.style.transform = `translate(0px, 0px)`;
-                inputState.steer = 0;
-            }
-        });
+        function endJoystick() {
+            joyActive = false;
+            joystickKnob.style.transform = `translate(0px, 0px)`;
+            inputState.steer = 0;
+        }
+
+        window.addEventListener('pointerup', endJoystick);
+        window.addEventListener('pointercancel', endJoystick);
+        document.addEventListener('touchend', endJoystick);
+        document.addEventListener('touchcancel', endJoystick);
 
         function updateJoystick(e) {
-            let dx = e.clientX - joyCenter.x;
-            let dy = e.clientY - joyCenter.y;
+            // Support both mouse/pointer and touch events
+            let clientX = e.clientX;
+            let clientY = e.clientY;
+            
+            if (e.touches && e.touches.length > 0) {
+                // If this is a touch move, find the touch that is on the left side of the screen
+                for (let i = 0; i < e.touches.length; i++) {
+                    if (e.touches[i].clientX < window.innerWidth / 2) {
+                        clientX = e.touches[i].clientX;
+                        clientY = e.touches[i].clientY;
+                        break;
+                    }
+                }
+            }
+
+            let dx = clientX - joyCenter.x;
+            let dy = clientY - joyCenter.y;
             let dist = Math.sqrt(dx*dx + dy*dy);
             
             if (dist > maxDist) {
@@ -259,6 +294,7 @@
         // Throttle Logic
         throttleBtn.addEventListener('pointerdown', () => { inputState.throttle = 1; });
         throttleBtn.addEventListener('pointerup', () => { inputState.throttle = 0; });
+        throttleBtn.addEventListener('pointercancel', () => { inputState.throttle = 0; });
         throttleBtn.addEventListener('pointerleave', () => { inputState.throttle = 0; });
 
         function sendInput() {
