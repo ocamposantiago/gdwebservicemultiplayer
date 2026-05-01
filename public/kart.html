@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kart Controller</title>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            text-align: center;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+            overflow: hidden;
+        }
+
+        #setupSection {
+            background: #1e1e1e;
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            max-width: 90%;
+            width: 350px;
+        }
+
+        input {
+            width: 100%;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            border: none;
+            font-size: 1.1rem;
+            box-sizing: border-box;
+            text-align: center;
+            background: #2c2c2c;
+            color: white;
+        }
+
+        button.btn-primary {
+            background: linear-gradient(135deg, #00e676 0%, #00c853 100%);
+            color: #000;
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.1s;
+        }
+        button.btn-primary:active {
+            transform: scale(0.95);
+        }
+
+        #gameSection {
+            display: none;
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        .status {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.5);
+            padding: 5px 15px;
+            border-radius: 20px;
+            color: #bbb;
+            font-size: 0.9rem;
+        }
+
+        #joystickZone {
+            position: absolute;
+            left: 10%;
+            bottom: 10%;
+            width: 150px;
+            height: 150px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #joystickKnob {
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            position: absolute;
+            transition: transform 0.05s ease-out;
+            pointer-events: none;
+        }
+
+        #throttleBtn {
+            position: absolute;
+            right: 10%;
+            bottom: 10%;
+            width: 120px;
+            height: 120px;
+            background: linear-gradient(135deg, #ff1744 0%, #d50000 100%);
+            border-radius: 50%;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+            box-shadow: 0 10px 25px rgba(255, 23, 68, 0.4);
+        }
+
+        #throttleBtn:active {
+            transform: scale(0.95);
+            background: linear-gradient(135deg, #d50000 0%, #b71c1c 100%);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="setupSection">
+        <h1 style="color: #00e676;">KART RACER</h1>
+        <input type="text" id="playerNameInput" placeholder="Enter your Name">
+        <button id="connectBtn" class="btn-primary">Connect & Play</button>
+    </div>
+
+    <div id="gameSection">
+        <div id="status" class="status">Connecting...</div>
+        
+        <div id="joystickZone">
+            <div id="joystickKnob"></div>
+        </div>
+
+        <button id="throttleBtn">GO</button>
+    </div>
+
+    <script>
+        const setupSection = document.getElementById('setupSection');
+        const gameSection = document.getElementById('gameSection');
+        const connectBtn = document.getElementById('connectBtn');
+        const playerNameInput = document.getElementById('playerNameInput');
+        const statusEl = document.getElementById('status');
+        
+        const joystickZone = document.getElementById('joystickZone');
+        const joystickKnob = document.getElementById('joystickKnob');
+        const throttleBtn = document.getElementById('throttleBtn');
+
+        let ws = null;
+        let myPlayerId = 1;
+        let playerName = "Player";
+        let isConnected = false;
+
+        let inputState = { steer: 0, throttle: 0 };
+        let lastSendTime = 0;
+        let updateInterval = null;
+
+        connectBtn.addEventListener('click', () => {
+            if (playerNameInput.value.trim() !== '') {
+                playerName = playerNameInput.value.trim();
+                setupSection.style.display = 'none';
+                gameSection.style.display = 'block';
+                connectWebSocket();
+            } else {
+                alert("Please enter a name");
+            }
+        });
+
+        function connectWebSocket() {
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${window.location.host}`;
+            statusEl.textContent = `Connecting to ${wsUrl}...`;
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                statusEl.textContent = `Connected as ${playerName}`;
+                isConnected = true;
+                
+                // Start input loop
+                updateInterval = setInterval(sendInput, 33); // 30 FPS
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === "assign_id") {
+                        myPlayerId = data.id;
+                        statusEl.textContent = `Connected (Player ${myPlayerId})`;
+                        
+                        // Register name
+                        ws.send(JSON.stringify({
+                            address: "/name",
+                            args: [myPlayerId, playerName]
+                        }));
+                        
+                        // Change background color based on ID
+                        const colors = ['#121212', '#990000', '#000099', '#999900', '#009900'];
+                        document.body.style.backgroundColor = colors[myPlayerId] || colors[0];
+                    }
+                } catch (e) {}
+            };
+
+            ws.onclose = () => {
+                isConnected = false;
+                statusEl.textContent = "Disconnected. Refresh to reconnect.";
+                clearInterval(updateInterval);
+            };
+        }
+
+        // Joystick Logic
+        let joyActive = false;
+        let joyCenter = { x: 0, y: 0 };
+        const maxDist = 75; // 150/2
+
+        joystickZone.addEventListener('pointerdown', (e) => {
+            joyActive = true;
+            const rect = joystickZone.getBoundingClientRect();
+            joyCenter = { x: rect.left + maxDist, y: rect.top + maxDist };
+            updateJoystick(e);
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            if (joyActive) updateJoystick(e);
+        });
+
+        window.addEventListener('pointerup', (e) => {
+            if (joyActive) {
+                joyActive = false;
+                joystickKnob.style.transform = `translate(0px, 0px)`;
+                inputState.steer = 0;
+            }
+        });
+
+        function updateJoystick(e) {
+            let dx = e.clientX - joyCenter.x;
+            let dy = e.clientY - joyCenter.y;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            
+            if (dist > maxDist) {
+                dx = (dx / dist) * maxDist;
+                dy = (dy / dist) * maxDist;
+            }
+            
+            joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+            
+            // Steer mapping: dx ranges from -maxDist to maxDist
+            inputState.steer = dx / maxDist;
+        }
+
+        // Throttle Logic
+        throttleBtn.addEventListener('pointerdown', () => { inputState.throttle = 1; });
+        throttleBtn.addEventListener('pointerup', () => { inputState.throttle = 0; });
+        throttleBtn.addEventListener('pointerleave', () => { inputState.throttle = 0; });
+
+        function sendInput() {
+            if (isConnected && ws.readyState === WebSocket.OPEN) {
+                // Address: "/kart"
+                // Args: [playerId, steer (-1 to 1), throttle (0 to 1)]
+                ws.send(JSON.stringify({
+                    address: "/kart",
+                    args: [myPlayerId, inputState.steer, inputState.throttle]
+                }));
+            }
+        }
+        
+        // Prevent default touch behaviors (scrolling, zooming)
+        document.addEventListener('contextmenu', event => event.preventDefault());
+        document.addEventListener('gesturestart', event => event.preventDefault());
+    </script>
+</body>
+</html>
