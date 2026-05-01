@@ -287,8 +287,14 @@
             
             joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
             
-            // Steer mapping: dx ranges from -maxDist to maxDist
-            inputState.steer = dx / maxDist;
+            // Binary steering mapping based on X axis
+            if (dx > 20) {
+                inputState.steer = 1;
+            } else if (dx < -20) {
+                inputState.steer = -1;
+            } else {
+                inputState.steer = 0;
+            }
         }
 
         // Throttle Logic
