@@ -97,24 +97,34 @@
             font-size: 0.9rem;
         }
 
-        #dpadZone {
+        #controlsContainer {
             position: absolute;
-            left: 5%;
-            bottom: 10%;
+            bottom: 15%;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 40px;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        #dpadZone {
             display: flex;
             gap: 20px;
         }
 
         .dpad-btn {
-            width: 90px;
-            height: 90px;
+            width: 80px;
+            height: 80px;
             background: rgba(255, 255, 255, 0.2);
             border: 2px solid rgba(255, 255, 255, 0.5);
             border-radius: 15px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2rem;
+            font-size: 1.8rem;
             font-weight: bold;
             color: white;
             user-select: none;
@@ -128,18 +138,18 @@
         }
 
         #throttleBtn {
-            position: absolute;
-            right: 10%;
-            bottom: 10%;
-            width: 120px;
-            height: 120px;
+            width: 100px;
+            height: 100px;
             background: linear-gradient(135deg, #ff1744 0%, #d50000 100%);
             border-radius: 50%;
             border: none;
             color: white;
-            font-size: 1.5rem;
+            font-size: 1.2rem;
             font-weight: bold;
             box-shadow: 0 10px 25px rgba(255, 23, 68, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         #throttleBtn:active {
@@ -159,12 +169,14 @@
     <div id="gameSection">
         <div id="status" class="status">Connecting...</div>
         
-        <div id="dpadZone">
-            <div id="btnLeft" class="dpad-btn">L</div>
-            <div id="btnRight" class="dpad-btn">R</div>
-        </div>
+        <div id="controlsContainer">
+            <div id="dpadZone">
+                <div id="btnLeft" class="dpad-btn">L</div>
+                <div id="btnRight" class="dpad-btn">R</div>
+            </div>
 
-        <button id="throttleBtn">GO</button>
+            <button id="throttleBtn">GO</button>
+        </div>
     </div>
 
     <script>
