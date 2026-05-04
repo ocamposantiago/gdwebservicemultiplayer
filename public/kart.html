@@ -97,28 +97,34 @@
             font-size: 0.9rem;
         }
 
-        #joystickZone {
+        #dpadZone {
             position: absolute;
-            left: 10%;
+            left: 5%;
             bottom: 10%;
-            width: 150px;
-            height: 150px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 50%;
-            border: 2px solid rgba(255, 255, 255, 0.3);
+            display: flex;
+            gap: 20px;
+        }
+
+        .dpad-btn {
+            width: 90px;
+            height: 90px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 15px;
             display: flex;
             align-items: center;
             justify-content: center;
+            font-size: 2rem;
+            font-weight: bold;
+            color: white;
+            user-select: none;
+            touch-action: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
 
-        #joystickKnob {
-            width: 60px;
-            height: 60px;
-            background: rgba(255, 255, 255, 0.8);
-            border-radius: 50%;
-            position: absolute;
-            transition: transform 0.05s ease-out;
-            pointer-events: none;
+        .dpad-btn:active {
+            background: rgba(255, 255, 255, 0.4);
+            transform: scale(0.95);
         }
 
         #throttleBtn {
@@ -153,8 +159,9 @@
     <div id="gameSection">
         <div id="status" class="status">Connecting...</div>
         
-        <div id="joystickZone">
-            <div id="joystickKnob"></div>
+        <div id="dpadZone">
+            <div id="btnLeft" class="dpad-btn">L</div>
+            <div id="btnRight" class="dpad-btn">R</div>
         </div>
 
         <button id="throttleBtn">GO</button>
@@ -167,8 +174,8 @@
         const playerNameInput = document.getElementById('playerNameInput');
         const statusEl = document.getElementById('status');
         
-        const joystickZone = document.getElementById('joystickZone');
-        const joystickKnob = document.getElementById('joystickKnob');
+        const btnLeft = document.getElementById('btnLeft');
+        const btnRight = document.getElementById('btnRight');
         const throttleBtn = document.getElementById('throttleBtn');
 
         let ws = null;
@@ -233,69 +240,16 @@
             };
         }
 
-        // Joystick Logic
-        let joyActive = false;
-        let joyCenter = { x: 0, y: 0 };
-        const maxDist = 75; // 150/2
+        // D-Pad Logic
+        btnLeft.addEventListener('pointerdown', () => { inputState.steer = 1; });
+        btnLeft.addEventListener('pointerup', () => { inputState.steer = 0; });
+        btnLeft.addEventListener('pointercancel', () => { inputState.steer = 0; });
+        btnLeft.addEventListener('pointerleave', () => { inputState.steer = 0; });
 
-        joystickZone.addEventListener('pointerdown', (e) => {
-            joyActive = true;
-            const rect = joystickZone.getBoundingClientRect();
-            joyCenter = { x: rect.left + maxDist, y: rect.top + maxDist };
-            updateJoystick(e);
-        });
-
-        window.addEventListener('pointermove', (e) => {
-            if (joyActive) updateJoystick(e);
-        });
-
-        function endJoystick() {
-            joyActive = false;
-            joystickKnob.style.transform = `translate(0px, 0px)`;
-            inputState.steer = 0;
-        }
-
-        window.addEventListener('pointerup', endJoystick);
-        window.addEventListener('pointercancel', endJoystick);
-        document.addEventListener('touchend', endJoystick);
-        document.addEventListener('touchcancel', endJoystick);
-
-        function updateJoystick(e) {
-            // Support both mouse/pointer and touch events
-            let clientX = e.clientX;
-            let clientY = e.clientY;
-            
-            if (e.touches && e.touches.length > 0) {
-                // If this is a touch move, find the touch that is on the left side of the screen
-                for (let i = 0; i < e.touches.length; i++) {
-                    if (e.touches[i].clientX < window.innerWidth / 2) {
-                        clientX = e.touches[i].clientX;
-                        clientY = e.touches[i].clientY;
-                        break;
-                    }
-                }
-            }
-
-            let dx = clientX - joyCenter.x;
-            let dy = clientY - joyCenter.y;
-            let dist = Math.sqrt(dx*dx + dy*dy);
-            
-            if (dist > maxDist) {
-                dx = (dx / dist) * maxDist;
-                dy = (dy / dist) * maxDist;
-            }
-            
-            joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
-            
-            // Binary steering mapping based on X axis
-            if (dx > 20) {
-                inputState.steer = -1; // Right turn is negative in Godot's mapped logic
-            } else if (dx < -20) {
-                inputState.steer = 1;  // Left turn is positive
-            } else {
-                inputState.steer = 0;
-            }
-        }
+        btnRight.addEventListener('pointerdown', () => { inputState.steer = -1; });
+        btnRight.addEventListener('pointerup', () => { inputState.steer = 0; });
+        btnRight.addEventListener('pointercancel', () => { inputState.steer = 0; });
+        btnRight.addEventListener('pointerleave', () => { inputState.steer = 0; });
 
         // Throttle Logic
         throttleBtn.addEventListener('pointerdown', () => { inputState.throttle = 1; });
