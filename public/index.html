@@ -274,23 +274,27 @@
                             myPlayerId = data.id;
                             updateStatus(`Connected as ${playerName} (Player ${myPlayerId})`, true);
                             
-                            // Send name to server
-                            ws.send(JSON.stringify({
-                                address: "/name",
-                                args: [myPlayerId, playerName]
-                            }));
-                            
-                            // Change background color based on Player ID
+                            // Determine player color based on ID
+                            let playerColor;
                             if (myPlayerId === 1) {
-                                document.body.style.backgroundColor = '#ff003c'; // Bright Saturated Red
+                                playerColor = '#ff003c'; // Bright Saturated Red
+                                document.body.style.backgroundColor = playerColor;
                                 document.querySelector('.container').style.backgroundColor = '#cc0030';
                             } else if (myPlayerId === 2) {
-                                document.body.style.backgroundColor = '#0066ff'; // Bright Saturated Blue
+                                playerColor = '#0066ff'; // Bright Saturated Blue
+                                document.body.style.backgroundColor = playerColor;
                                 document.querySelector('.container').style.backgroundColor = '#004bcc';
                             } else {
-                                document.body.style.backgroundColor = '#ffcc00'; // Bright Saturated Yellow
+                                playerColor = '#ffcc00'; // Bright Saturated Yellow
+                                document.body.style.backgroundColor = playerColor;
                                 document.querySelector('.container').style.backgroundColor = '#ccaa00';
                             }
+                            
+                            // Send name + color to server
+                            ws.send(JSON.stringify({
+                                address: "/name",
+                                args: [myPlayerId, playerName, playerColor]
+                            }));
                             
                             // Trigger connection haptic
                             if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
